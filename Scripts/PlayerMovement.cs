@@ -9,20 +9,17 @@ public class PlayerMovement : MonoBehaviour
     
     public float moveSpeed, jumpForce;
     private float startTime, timePressed;
-    private int inputX;//eg 1, 0 ,-1, for left right moving 
+    private float inputX;//eg 1, 0 ,-1, for left right moving 
     private int jumpDirection;//eg: 1, 0 ,-1, for deciding jumping direction
     private bool pressingForJump;//record if player is pressing for jump for now
-    // Start is called before the first frame update
-
     private float lastFrameVelocityY;
-
-    //public Transform groundCheck;
-    //public float groundCheckRadius;
-    //public LayerMask groundLayer;
     private bool onGround;
+    private bool onGroundCheckAgain;
     void Start()
     {
         onGround = true;
+        this.GetComponent<Animator>().SetBool("falling", false);
+        this.GetComponent<Animator>().SetBool("jumping", false);
 
     }
 
@@ -40,25 +37,49 @@ public class PlayerMovement : MonoBehaviour
     }
     void FixedUpdate()
     {
+        //Debug.Log(playerRigidBody.velocity.y);
         lastFrameVelocityY = playerRigidBody.velocity.y;
-        playerRigidBody.velocity = new Vector2(inputX * moveSpeed, playerRigidBody.velocity.y);
+        playerRigidBody.velocity = new Vector2(inputX * moveSpeed, playerRigidBody.velocity.y );
         if (playerRigidBody.velocity.x > 0f) {
-
+            //going right
             transform.localScale = Vector3.one;
         }
         else if (playerRigidBody.velocity.x < 0f) {
+            //going left
             transform.localScale = new Vector3(-1, 1, 1);
+        }
+        //jumping
+        if (playerRigidBody.velocity.y > 0.001f) {
+            //set jumping animation
+            this.GetComponent<Animator>().SetBool("falling", false);
+            this.GetComponent<Animator>().SetBool("jumping", true);
+
+        }
+        //falling
+        else if (playerRigidBody.velocity.y <= -0.001f) {
+            //set falling animation
+            this.GetComponent<Animator>().SetBool("jumping", false);
+            this.GetComponent<Animator>().SetBool("falling", true);
+        }
+        //idle
+        else {
+            this.GetComponent<Animator>().SetBool("jumping", false);
+            this.GetComponent<Animator>().SetBool("falling", false);
         }
     }
     public void MoveLeft(InputAction.CallbackContext context) {
         //when idle and not decided jump direction
-        if (jumpDirection == 0) {
+        if (jumpDirection == 0)
+        {
             //if not pressing jump button
-            if (!pressingForJump && Mathf.Abs(lastFrameVelocityY - playerRigidBody.velocity.y) <= 0.001f) {
+            if (!pressingForJump && Mathf.Abs(lastFrameVelocityY - playerRigidBody.velocity.y) <= 0.001f)
+            {
                 //if 'A' is being held by player
-                if (context.performed) {
+                if (context.performed)
+                {
 
                     inputX = -1;
+                    
                 }
                 //if 'A' is release by player
                 if (context.canceled)
@@ -67,6 +88,7 @@ public class PlayerMovement : MonoBehaviour
                 }
             }
         }
+        
     }
     public void MoveRight(InputAction.CallbackContext context)
     {
@@ -80,6 +102,7 @@ public class PlayerMovement : MonoBehaviour
                 if (context.performed)
                 {
                     inputX = 1;
+                    
                 }
                 //if 'D' is release by player
                 if (context.canceled)
@@ -88,12 +111,97 @@ public class PlayerMovement : MonoBehaviour
                 }
             }
         }
+       
     }
+
+
+
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        
+        onGroundCheckAgain = true;
+
+        this.GetComponent<Rigidbody2D>().freezeRotation = true;
+        if (collision.collider.tag == "TileInair") {
+            //Debug.Log(this.transform.position.y-0.5);
+            //Vector3 contactPoint = collision.contacts[0].point;
+            Vector3 center = collision.collider.bounds.center;
+            if (this.transform.position.y-0.5f - center.y - collision.collider.bounds.size.y / 2 >= 0.001f )
+            {
+                //if hit top of tile collider
+                jumpDirection = 0;
+                inputX = 0;
+                jumpForce = 0;
+                playerRigidBody.velocity = new Vector2(playerRigidBody.velocity.x, 0);
+            }
+            else if (this.transform.position.y - center.y + collision.collider.bounds.size.y / 2 <= 0.001f)
+            {
+                //if hit bottom of tile collider
+                //slow down
+                inputX = (float)(0.66 * inputX);
+            }
+            //else if (Mathf.Abs(this.transform.position.y + 0.5f - center.y  + collision.collider.bounds.size.y/2) <=  0.002f)
+            //{
+            //    //for weird corner collision detection
+
+            //    //Debug.Log(collision.GetContact(0).normal.y);
+            //    //Debug.Log(contactPoint.y);
+            //    //Debug.Log(center.y - collision.collider.bounds.size.y/2);
+                
+            //    //slowdown since it's hitting bot
+            //    //Debug.Log("here");
+            //    //jumpForce = (float)0.7 * jumpForce;
+            //    //if (Mathf.Abs(Mathf.Abs(contactPoint.y) - Mathf.Abs(center.y - collision.collider.bounds.size.y / 2)) <= 0.001f) {
+            //    //    inputX = -inputX;
+            //    //}
+            //    //playerRigidBody.AddForce(new Vector2(inputX,-1)/2, ForceMode2D.Impulse);
+
+
+            //}
+            else
+            {
+                Debug.Log(this.transform.position.y - 0.5f - center.y - collision.collider.bounds.size.y / 2);
+                //otherwise reflect 
+                inputX = -inputX;
+                
+            }
+        }
+
+        else if (collision.collider.tag == "BaseTile") {
+            if (lastFrameVelocityY - playerRigidBody.velocity.y <= 0.001f)
+            {
+                playerRigidBody.velocity = new Vector2(playerRigidBody.velocity.x, 0);
+                jumpDirection = 0;
+                inputX = 0;
+            }
+
+        } else if (collision.collider.tag == "SideTile") {
+            if (!onGround) {
+                inputX = -inputX;
+                jumpDirection = 0;
+            }
+            
+        }
+
+    }
+    private void OnCollisionExit2D(Collision2D collision)
+    {
+        this.GetComponent<Rigidbody2D>().freezeRotation = true;
+        onGround = false;
+        onGroundCheckAgain = false;
+    }
+    private void OnCollisionStay2D(Collision2D collision)
+    {
+        onGroundCheckAgain = true;
+        this.GetComponent<Rigidbody2D>().freezeRotation = true;
+    }
+
 
     public void Jump(InputAction.CallbackContext context)
     {
-        if (onGround) {
-            
+        if (onGround)
+        {
+
             if (context.performed)
             {
                 //if record player input is heading right while pressing jump button
@@ -114,12 +222,16 @@ public class PlayerMovement : MonoBehaviour
             }
             if (context.canceled)
             {
-                
-                timePressed = Time.time- startTime;
-                jumpForce = 5 * timePressed;
-                if (jumpForce > 10)
+                //fixing starttime bug
+                if (startTime == 0) {
+                    startTime = Time.time;
+                }
+
+                timePressed = Time.time - startTime;
+                jumpForce = 4 * timePressed;
+                if (jumpForce > 8)
                 {
-                    jumpForce = 10;
+                    jumpForce = 8;
                 }
                 playerRigidBody.velocity = new Vector2(playerRigidBody.velocity.x, jumpForce);
                 //when releasing jump button , the player should be anle to jump with a direction
@@ -128,66 +240,10 @@ public class PlayerMovement : MonoBehaviour
                 //and also set pressing for jump flag as false since we are releasing jump button
                 pressingForJump = false;
                 startTime = 0;
-            }
-        }
-        
-    }
 
-    private void OnCollisionEnter2D(Collision2D collision)
-    {
-        this.GetComponent<Rigidbody2D>().freezeRotation = true;
-        if (collision.collider.tag == "TileInair") {
-
-            Vector3 contactPoint = collision.contacts[0].point;
-            Vector3 center = collision.collider.bounds.center;
-            if (contactPoint.y >= center.y + collision.collider.bounds.size.y / 2)
-            {
-                //meaning it's on top of tile
-                if (lastFrameVelocityY - playerRigidBody.velocity.y <= 0.001f) {
-                    playerRigidBody.velocity = new Vector2(playerRigidBody.velocity.x, 0);
-                    jumpDirection = 0;
-                    inputX = 0;
-                }
-
-            }
-            else if (contactPoint.y - (center.y - collision.collider.bounds.size.y / 2) < 0.001f)
-            {
-                //donothing since it's hitting bot
-            }
-            else
-            {
-                //otherwise reflect 
-                inputX = -inputX;
-                //if ((this.GetComponent<PlayerInput>().actions["MoveLeft"].IsPressed() && Mathf.Abs(lastFrameVelocityY - playerRigidBody.velocity.y) <= 0.001f) ||
-                //    (this.GetComponent<PlayerInput>().actions["MoveRight"].IsPressed() && Mathf.Abs(lastFrameVelocityY - playerRigidBody.velocity.y) <= 0.001f))
-                //{
-                //    inputX = 0;
-                //}
             }
         }
 
-        else if (collision.collider.tag == "BaseTile") {
-            if (lastFrameVelocityY - playerRigidBody.velocity.y <= 0.001f)
-            {
-                playerRigidBody.velocity = new Vector2(playerRigidBody.velocity.x, 0);
-                jumpDirection = 0;
-                inputX = 0;
-            }
+    }
 
-        } else if (collision.collider.tag == "SideTile") {
-            inputX = -inputX;
-            jumpDirection = 0;
-        }
-
-    }
-    private void OnCollisionExit2D(Collision2D collision)
-    {
-        this.GetComponent<Rigidbody2D>().freezeRotation = true;
-        onGround = false;
-    }
-    private void OnCollisionStay2D(Collision2D collision)
-    {
-        this.GetComponent<Rigidbody2D>().freezeRotation = true;
-    }
-    
 }
