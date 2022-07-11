@@ -9,7 +9,7 @@ public class PlayerMovement : MonoBehaviour
     
     public float moveSpeed, jumpForce;
     private float startTime, timePressed;
-    private int inputX;//eg 1, 0 ,-1, for left right moving 
+    private float inputX;//eg 1, 0 ,-1, for left right moving 
     private int jumpDirection;//eg: 1, 0 ,-1, for deciding jumping direction
     private bool pressingForJump;//record if player is pressing for jump for now
     private float lastFrameVelocityY;
@@ -114,97 +114,53 @@ public class PlayerMovement : MonoBehaviour
        
     }
 
-    public void Jump(InputAction.CallbackContext context)
-    {
-        if (onGround) {
-            
-            if (context.performed)
-            {
-                //if record player input is heading right while pressing jump button
-                if (inputX == 1)
-                {
-                    //set jumpdirection as 1, so that it will then jump right afterwards
-                    jumpDirection = 1;
-                }
-                else if (inputX == -1)
-                {
-                    //if user is heading left, it then decide to jump left afterwards
-                    jumpDirection = -1;
-                }
-                //otherwise if inputX from user is any other value, set it back to 0
-                inputX = 0;
-                startTime = Time.time;
-                pressingForJump = true;
-            }
-            if (context.canceled)
-            {
-                
-                timePressed = Time.time- startTime;
-                jumpForce = 4 * timePressed;
-                if (jumpForce > 8)
-                {
-                    jumpForce = 8;
-                }
-                playerRigidBody.velocity = new Vector2(playerRigidBody.velocity.x, jumpForce);
-                //when releasing jump button , the player should be anle to jump with a direction
-                //either left or right or no direction like straight up
-                inputX = jumpDirection;
-                //and also set pressing for jump flag as false since we are releasing jump button
-                pressingForJump = false;
-                startTime = 0;
 
-            }
-        }
-        
-    }
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
+        
         onGroundCheckAgain = true;
 
         this.GetComponent<Rigidbody2D>().freezeRotation = true;
         if (collision.collider.tag == "TileInair") {
-
-            Vector3 contactPoint = collision.contacts[0].point;
+            //Debug.Log(this.transform.position.y-0.5);
+            //Vector3 contactPoint = collision.contacts[0].point;
             Vector3 center = collision.collider.bounds.center;
-            if (contactPoint.y >= center.y + collision.collider.bounds.size.y / 2)
+            if (this.transform.position.y-0.5f - center.y - collision.collider.bounds.size.y / 2 >= 0.001f )
             {
-                //meaning it's on top of tile
-                if (lastFrameVelocityY - playerRigidBody.velocity.y <= 0.001f) {
-                    //make sure it's on top
-                    if (this.gameObject.transform.position.y - this.GetComponent<CircleCollider2D>().bounds.size.y / 2 >= center.y + collision.collider.bounds.size.y / 2)
-                    {
-                        playerRigidBody.velocity = new Vector2(playerRigidBody.velocity.x, 0);
-                        jumpDirection = 0;
-                        inputX = 0;
-                    }
-                    else {
-                        inputX = -inputX;
-                    }
-         
-                }
-
+                //if hit top of tile collider
+                jumpDirection = 0;
+                inputX = 0;
+                jumpForce = 0;
+                playerRigidBody.velocity = new Vector2(playerRigidBody.velocity.x, 0);
             }
-            else if (contactPoint.y <= center.y - collision.collider.bounds.size.y /2)
+            else if (this.transform.position.y - center.y + collision.collider.bounds.size.y / 2 <= 0.001f)
             {
-                //for weird corner collision detection
+                //if hit bottom of tile collider
+                //slow down
+                inputX = (float)(0.66 * inputX);
+            }
+            //else if (Mathf.Abs(this.transform.position.y + 0.5f - center.y  + collision.collider.bounds.size.y/2) <=  0.002f)
+            //{
+            //    //for weird corner collision detection
 
-                Debug.Log(collision.GetContact(0).normal.y);
-                Debug.Log(contactPoint.y);
-                Debug.Log(center.y - collision.collider.bounds.size.y/2);
+            //    //Debug.Log(collision.GetContact(0).normal.y);
+            //    //Debug.Log(contactPoint.y);
+            //    //Debug.Log(center.y - collision.collider.bounds.size.y/2);
                 
-                //slowdown since it's hitting bot
-                Debug.Log("here");
-                //jumpForce = (float)0.7 * jumpForce;
-                //if (Mathf.Abs(Mathf.Abs(contactPoint.y) - Mathf.Abs(center.y - collision.collider.bounds.size.y / 2)) <= 0.001f) {
-                //    inputX = -inputX;
-                //}
-                //playerRigidBody.AddForce(new Vector2(inputX,-1)/2, ForceMode2D.Impulse);
+            //    //slowdown since it's hitting bot
+            //    //Debug.Log("here");
+            //    //jumpForce = (float)0.7 * jumpForce;
+            //    //if (Mathf.Abs(Mathf.Abs(contactPoint.y) - Mathf.Abs(center.y - collision.collider.bounds.size.y / 2)) <= 0.001f) {
+            //    //    inputX = -inputX;
+            //    //}
+            //    //playerRigidBody.AddForce(new Vector2(inputX,-1)/2, ForceMode2D.Impulse);
 
 
-            }
+            //}
             else
             {
+                Debug.Log(this.transform.position.y - 0.5f - center.y - collision.collider.bounds.size.y / 2);
                 //otherwise reflect 
                 inputX = -inputX;
                 
@@ -239,5 +195,55 @@ public class PlayerMovement : MonoBehaviour
         onGroundCheckAgain = true;
         this.GetComponent<Rigidbody2D>().freezeRotation = true;
     }
-    
+
+
+    public void Jump(InputAction.CallbackContext context)
+    {
+        if (onGround)
+        {
+
+            if (context.performed)
+            {
+                //if record player input is heading right while pressing jump button
+                if (inputX == 1)
+                {
+                    //set jumpdirection as 1, so that it will then jump right afterwards
+                    jumpDirection = 1;
+                }
+                else if (inputX == -1)
+                {
+                    //if user is heading left, it then decide to jump left afterwards
+                    jumpDirection = -1;
+                }
+                //otherwise if inputX from user is any other value, set it back to 0
+                inputX = 0;
+                startTime = Time.time;
+                pressingForJump = true;
+            }
+            if (context.canceled)
+            {
+                //fixing starttime bug
+                if (startTime == 0) {
+                    startTime = Time.time;
+                }
+
+                timePressed = Time.time - startTime;
+                jumpForce = 4 * timePressed;
+                if (jumpForce > 8)
+                {
+                    jumpForce = 8;
+                }
+                playerRigidBody.velocity = new Vector2(playerRigidBody.velocity.x, jumpForce);
+                //when releasing jump button , the player should be anle to jump with a direction
+                //either left or right or no direction like straight up
+                inputX = jumpDirection;
+                //and also set pressing for jump flag as false since we are releasing jump button
+                pressingForJump = false;
+                startTime = 0;
+
+            }
+        }
+
+    }
+
 }
